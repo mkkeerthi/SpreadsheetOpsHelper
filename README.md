@@ -25,7 +25,7 @@ The sections below cover installing the prerequisites, granting the macOS permis
 |---|---|
 | macOS | macOS 12 Monterey or later recommended. Apple Silicon and Intel are both supported. |
 | Python | 3.10 or newer; 3.12 or 3.13 recommended. Verify with `python3 --version`. |
-| Tkinter | Required for the **Browse** file picker. Included with the python.org installer; Homebrew needs the matching `python-tk` package. |
+| Tkinter | Required for the **Browse** file picker, which opens in a short-lived helper process. Included with the python.org installer; Homebrew needs the matching `python-tk` package. |
 | pip and venv | Included with Python. Dependencies are installed into a project-local virtual environment. |
 | Apple Numbers | Optional. Only needed to read or write `.numbers` files. Free from the Mac App Store. |
 | Disk space | Several hundred MB for the virtual environment and Streamlit's dependencies. |
@@ -118,7 +118,7 @@ The virtual environment also prevents macOS and Homebrew Python from rejecting g
 
 #### File browser (Browse buttons)
 
-The first time you use **Browse**, macOS may ask for access to Desktop, Documents, or Downloads. Allow it for the application you started Streamlit from (Terminal, iTerm2, or VS Code).
+The first time you use **Browse**, macOS may ask for access to Desktop, Documents, or Downloads. Allow it for the application you started Streamlit from (Terminal, iTerm2, or VS Code). The picker runs as a short-lived child process, so macOS attributes that access to the terminal or IDE app, not to a separate dialog app.
 
 If no prompt appears and the file picker cannot see a folder:
 
@@ -177,7 +177,8 @@ Stopping the app with `Ctrl+C` frees the port. If macOS asks whether to allow in
 | `zsh: command not found: python3` | Install Python from python.org or Homebrew. For Homebrew, follow the `brew shellenv` instructions and open a new Terminal. |
 | `which python3` shows `/usr/bin/python3` | The macOS stub is being used instead of your install. Fix `PATH` (Homebrew `shellenv`) or use the full path to the python.org interpreter. |
 | `No module named streamlit` | The virtual environment is not active. Run `source .venv/bin/activate`, then `python -m pip install -r requirements.txt`. |
-| `ModuleNotFoundError: No module named '_tkinter'` or Browse does nothing | Tkinter is missing. Install `python-tk@X.Y` matching `python3 --version`, or reinstall Python from python.org. You can still type file paths manually. |
+| `ModuleNotFoundError: No module named '_tkinter'` or Browse shows "Could not open the file dialog" | Tkinter is missing. Install `python-tk@X.Y` matching `python3 --version`, or reinstall Python from python.org. You can still type file paths manually. |
+| `NSWindow drag regions should only be invalidated on the Main Thread!` followed by `zsh: abort` when clicking **Browse** | An outdated copy creates the file picker on Streamlit's worker thread, which macOS aborts. Update to the current version, where the picker runs in its own process; type paths manually until then. Python cannot catch this crash. |
 | `externally-managed-environment` from pip | You are outside the virtual environment. Run `source .venv/bin/activate` and install again. |
 | `Address already in use` | Another Streamlit instance is running. Stop it or add `--server.port 8502`. |
 | Browser does not open | Visit http://localhost:8501 manually. |
@@ -244,6 +245,7 @@ python -m unittest discover -s tests -v
 ```
 app.py                  Streamlit UI (Action, Input, Output)
 core/adapters.py        Format dispatch and supported extensions
+core/dialog.py          Tk file picker, launched as a separate process
 core/workbook.py        xlsx/csv read, last-data-row detection, timestamped save
 core/validator.py       Sheet/column checks and row-range parsing
 core/copier.py          Row copy engine and per-sheet counts

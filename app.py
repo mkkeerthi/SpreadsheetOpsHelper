@@ -4,8 +4,9 @@ from pathlib import Path
 
 import streamlit as st
 
-from core.adapters import BROWSE_FILETYPES, open_workbook
+from core.adapters import open_workbook
 from core.copier import copy_ranges
+from core.dialog import DialogError, choose_file
 from core.logging_setup import close_run_logger, get_run_logger
 from core.numbers_macos import UnsupportedPlatformError
 from core.validator import ValidationError, compare_workbooks, parse_ranges
@@ -37,44 +38,12 @@ def _clean_path(value: str | None) -> str:
 
 def _ask_for_file(initial: str) -> str | None:
     try:
-        import tkinter as tk
-        from tkinter import filedialog
-    except Exception as exc:
-        st.session_state["browse_error"] = (
-            f"File dialog is unavailable ({exc}). Type the path instead."
-        )
-        return None
-
-    root = None
-    try:
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes("-topmost", True)
-        root.update()
-
-        start_dir = Path(initial).parent if initial else Path.home()
-        if not start_dir.is_dir():
-            start_dir = Path.home()
-
-        return (
-            filedialog.askopenfilename(
-                title="Select a spreadsheet",
-                initialdir=str(start_dir),
-                filetypes=BROWSE_FILETYPES,
-            )
-            or None
-        )
-    except Exception as exc:
+        return choose_file(initial)
+    except DialogError as exc:
         st.session_state["browse_error"] = (
             f"Could not open the file dialog ({exc}). Type the path instead."
         )
         return None
-    finally:
-        if root is not None:
-            try:
-                root.destroy()
-            except Exception:
-                pass
 
 
 def _browse_callback(state_key: str) -> None:

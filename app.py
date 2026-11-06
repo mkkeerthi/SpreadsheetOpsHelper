@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import streamlit as st
@@ -27,6 +28,7 @@ def _init_state() -> None:
         "result": None,
         "failure": None,
         "browse_error": None,
+        "theme_choice": None,
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
@@ -34,6 +36,51 @@ def _init_state() -> None:
 
 def _clean_path(value: str | None) -> str:
     return (value or "").strip().strip('"').strip("'")
+
+
+def _is_dark_theme() -> bool:
+    return st.context.theme.type == "dark"
+
+
+def _request_theme_change() -> None:
+    st.session_state["theme_choice"] = st.session_state["dark_theme"]
+
+
+def _apply_theme(dark: bool | None) -> None:
+    """Store the appearance Streamlit reads when the page loads.
+
+    Streamlit resolves the theme in the browser, so a change needs a reload.
+    ``dark=None`` keeps the stored choice and only records the light default
+    when the browser follows the operating system instead of a fixed theme.
+    """
+    desired = None if dark is None else ("Dark" if dark else "Light")
+    st.html(
+        f"""
+        <script>
+        (() => {{
+          const key = `stActiveTheme-${{window.location.pathname}}-v2`;
+          const stored = localStorage.getItem(key);
+          const desired = {json.dumps(desired)};
+          const light = JSON.stringify("Light");
+          const darkChoice = JSON.stringify("Dark");
+          try {{
+            if (desired !== null) {{
+              if (stored !== JSON.stringify(desired)) {{
+                localStorage.setItem(key, JSON.stringify(desired));
+                window.location.reload();
+              }}
+            }} else if (stored !== light && stored !== darkChoice) {{
+              localStorage.setItem(key, light);
+              if ({json.dumps(_is_dark_theme())}) window.location.reload();
+            }}
+          }} catch (error) {{
+            console.warn("Could not store the theme preference.", error);
+          }}
+        }})();
+        </script>
+        """,
+        unsafe_allow_javascript=True,
+    )
 
 
 def _ask_for_file(initial: str) -> str | None:
@@ -251,7 +298,15 @@ def _render_results() -> None:
 st.set_page_config(page_title="Numbers Work Helper", layout="wide")
 _init_state()
 
-st.title("Numbers Work Helper")
+title_column, theme_column = st.columns([5, 1], vertical_alignment="center")
+title_column.title("Numbers Work Helper")
+theme_column.toggle(
+    "Dark theme",
+    value=_is_dark_theme(),
+    key="dark_theme",
+    on_change=_request_theme_change,
+    help="Switch between the light and dark colour theme.",
+)
 
 with st.container(border=True):
     st.subheader("Action")
@@ -356,3 +411,7 @@ with st.container(border=True):
     if submit_clicked:
         _run_submit(progress_slot)
     _render_results()
+
+theme_choice = st.session_state.get("theme_choice")
+st.session_state["theme_choice"] = None
+_apply_theme(theme_choice)
